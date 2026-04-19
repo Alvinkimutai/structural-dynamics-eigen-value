@@ -1,3 +1,4 @@
 .venveigen/
 __pycache__/
-*.pyc
+*.pyc/
+command.txt
