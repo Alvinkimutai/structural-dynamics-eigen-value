@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 
 # =============================================================================
 # BUILDING SPECIFICATIONS
-# 25m x 25m, 10-storey, Kenya standard (BS 8110 / KS EAS 18)
+# 15m x 15m, 10-storey, Kenya standard (BS 8110 / KS EAS 18)
 # =============================================================================
 
 # --- Geometry ---
 n_storeys   = 10
 storey_h    = 3.0           # m (standard Kenya storey height)
-n_cols      = 36            # 6x6 grid on 5m spacing (0,5,10,15,20,25m each direction)
+n_cols      = 16            # 4x4 grid on 5m spacing (0,5,10,15m each direction)
 
 # --- Material: C25 Concrete ---
 fck         = 25e6          # Pa
@@ -22,25 +22,23 @@ b_col       = 0.200         # m (lateral direction)
 d_col       = 0.700         # m (perpendicular)
 I_col       = (b_col * d_col**3) / 12  # strong axis: bending in plane of 700mm
 
-# --- Storey lateral stiffness ---
-# Ground storey: fixed-pinned (pinned base) → k = 3EI/h³
-# Upper storeys: fixed-fixed (both ends restrained by beams) → k = 12EI/h³
-k_ground    = n_cols * (3  * E * I_col / storey_h**3)   # N/m  (storey 1)
-k_upper     = n_cols * (12 * E * I_col / storey_h**3)   # N/m  (storeys 2–10)
+# --- Storey lateral stiffness: k = 12EI/h^3 per column (fixed-fixed) ---
+k_col       = 12 * E * I_col / storey_h**3
+k_storey    = n_cols * k_col            # N/m
 
 # --- Floor mass ---
-# Slab: 150mm thick, 25x25m plan, concrete density 2500 kg/m³
-slab_mass   = 0.150 * 25 * 25 * 2500   # kg
+# Slab: 150mm thick, 15x15m plan, concrete density 2500 kg/m³
+slab_mass   = 0.150 * 15 * 15 * 2500   # kg
 
 # Superimposed dead load: 1.5 kN/m² (finishes + services)
-SDL_mass    = (1.5e3 / 9.81) * 25 * 25  # kg
+SDL_mass    = (1.5e3 / 9.81) * 15 * 15  # kg
 
 # Live load (seismic combination, 30% of LL per EC8): 2.5 kN/m²
-LL_mass     = 0.30 * (2.5e3 / 9.81) * 25 * 25  # kg
+LL_mass     = 0.30 * (2.5e3 / 9.81) * 15 * 15  # kg
 
-# Beam self-weight: 450x200mm beams, 5 bays x 2 directions x 2 lines x 5m span
+# Beam self-weight: 450x200mm beams, 4 bays x 2 directions x 5m span
 beam_vol    = 0.450 * 0.200 * 5.0      # m³ per beam
-n_beams     = 5 * 2 * 2                # 5 bays, 2 directions, 2 lines each
+n_beams     = 4 * 2 * 2                # 4 bays, 2 directions, 2 lines each
 beam_mass   = n_beams * beam_vol * 2500 # kg
 
 floor_mass  = slab_mass + SDL_mass + LL_mass + beam_mass  # kg per floor
@@ -48,11 +46,9 @@ floor_mass  = slab_mass + SDL_mass + LL_mass + beam_mass  # kg per floor
 print("=" * 55)
 print("BUILDING PARAMETERS")
 print("=" * 55)
-print(f"  Live load (30% of LL) : {LL_mass/1e3:.2f} tonnes")
 print(f"  Concrete E modulus    : {E/1e9:.2f} GPa")
 print(f"  Column I (strong axis): {I_col*1e6:.0f} cm⁴  ({I_col:.6f} m⁴)")
-print(f"  Ground storey k       : {k_ground/1e6:.3f} MN/m  (3EI/h³, pinned base)")
-print(f"  Upper storey k        : {k_upper/1e6:.3f} MN/m  (12EI/h³, fixed-fixed)")
+print(f"  Storey stiffness k    : {k_storey/1e6:.3f} MN/m")
 print(f"  Floor mass            : {floor_mass/1e3:.2f} tonnes")
 print()
 
@@ -62,20 +58,25 @@ print()
 
 M = np.diag([floor_mass] * n_storeys)
 
-# Assign correct stiffness per storey:
-# k[0] = ground storey (pinned base), k[1..9] = upper storeys (fixed-fixed)
-k_storeys = [k_ground] + [k_upper] * (n_storeys - 1)
-
 K = np.zeros((n_storeys, n_storeys))
 for i in range(n_storeys):
-    k = k_storeys[i]
+    K[i, i] += k_storey                        # current storey above
+    if i > 0:
+        K[i, i]     += k_storey                # storey below
+        K[i, i-1]   -= k_storey
+        K[i-1, i]   -= k_storey
+
+# Correct: top storey only has one storey stiffness contribution
+# Rebuild properly using tridiagonal assembly
+K = np.zeros((n_storeys, n_storeys))
+for i in range(n_storeys):
     if i < n_storeys - 1:
-        K[i,   i  ] += k
-        K[i+1, i+1] += k
-        K[i,   i+1] -= k
-        K[i+1, i  ] -= k
-# Add ground storey stiffness to first DOF (contribution from below floor 1)
-K[0, 0] += k_storeys[0]
+        K[i, i]     += k_storey
+        K[i+1, i+1] += k_storey
+        K[i, i+1]   -= k_storey
+        K[i+1, i]   -= k_storey
+# Add ground storey stiffness to first DOF
+K[0, 0] += k_storey
 
 # =============================================================================
 # 2. SOLVE GENERALISED EIGENVALUE PROBLEM: K*phi = omega^2 * M * phi
@@ -109,7 +110,7 @@ for i in range(n_storeys):
 floors = np.arange(0, n_storeys + 1)       # 0 = ground (fixed base)
 
 fig, axes = plt.subplots(1, 4, figsize=(14, 7), sharey=True)
-fig.suptitle("Mode Shapes — 10-Storey Shear Frame\n(25m×25m, C25, 200×700mm columns, Pinned Base)",
+fig.suptitle("Mode Shapes — 10-Storey Shear Frame\n(15m×15m, C25, 200×700mm columns)",
              fontsize=13)
 
 for idx in range(4):
@@ -126,6 +127,6 @@ axes[0].set_yticks(floors)
 axes[0].set_yticklabels([f"F{i}" if i > 0 else "GF" for i in floors])
 
 plt.tight_layout()
-plt.savefig("mode_shapes3.png", dpi=150, bbox_inches='tight')
+plt.savefig("mode_shapes2.png", dpi=150, bbox_inches='tight')
 plt.show()
 print("\nMode shape plot saved to mode_shapes.png")

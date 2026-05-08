@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc/
 command.txt
+ml_frequency_predictor_pinned_fixed.py
