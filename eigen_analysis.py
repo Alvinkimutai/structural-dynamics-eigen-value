@@ -38,17 +38,26 @@ SDL_mass    = (1.5e3 / 9.81) * 25 * 25  # kg
 # Live load (seismic combination, 30% of LL per EC8): 2.5 kN/m²
 LL_mass     = 0.30 * (2.5e3 / 9.81) * 25 * 25  # kg
 
-# Beam self-weight: 450x200mm beams, 5 bays x 2 directions x 2 lines x 5m span
-beam_vol    = 0.450 * 0.200 * 5.0      # m³ per beam
+# Beam self-weight: 500x200mm beams, 5 bays x 2 directions x 2 lines x 5m span
+beam_vol    = 0.500 * 0.200 * 5.0      # m³ per beam
 n_beams     = 5 * 2 * 2                # 5 bays, 2 directions, 2 lines each
 beam_mass   = n_beams * beam_vol * 2500 # kg
 
-floor_mass  = slab_mass + SDL_mass + LL_mass + beam_mass  # kg per floor
+# Total dead load mass per floor (slab + SDL + beams)
+total_DL_mass = slab_mass + SDL_mass + beam_mass  # kg
+
+# Total floor mass (slab + SDL + LL + beams)
+floor_mass  = total_DL_mass + LL_mass  # kg per floor
 
 print("=" * 55)
 print("BUILDING PARAMETERS")
 print("=" * 55)
-print(f"  Live load (30% of LL) : {LL_mass/1e3:.2f} tonnes")
+print(f"  Slab mass             : {slab_mass:.2f} kg")
+print(f"  Beam mass             : {beam_mass:.2f} kg")
+print(f"  Superimposed DL       : {SDL_mass:.2f} kg")
+print(f"  Live load (30% of LL) : {LL_mass:.2f} kg")
+print(f"  Total dead load mass  : {total_DL_mass:.2f} kg")
+print(f"  Total floor mass      : {floor_mass:.2f} kg")
 print(f"  Concrete E modulus    : {E/1e9:.2f} GPa")
 print(f"  Column I (strong axis): {I_col*1e6:.0f} cm⁴  ({I_col:.6f} m⁴)")
 print(f"  Ground storey k       : {k_ground/1e6:.3f} MN/m  (3EI/h³, pinned base)")
