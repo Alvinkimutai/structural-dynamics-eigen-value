@@ -35,8 +35,8 @@ slab_mass   = 0.150 * 25 * 25 * 2500   # kg
 # Superimposed dead load: 1.5 kN/m² (finishes + services)
 SDL_mass    = (1.5e3 / 9.81) * 25 * 25  # kg
 
-# Live load (seismic combination, 30% of LL per EC8): 2.5 kN/m²
-LL_mass     = 0.30 * (2.5e3 / 9.81) * 25 * 25  # kg
+# Live load (seismic combination, 30% of LL per EC8): 2.0 kN/m²
+LL_mass     = 0.30 * (2.0e3 / 9.81) * 25 * 25  # kg
 
 # Beam self-weight: 500x200mm beams, 5 bays x 2 directions x 2 lines x 5m span
 beam_vol    = 0.500 * 0.200 * 5.0      # m³ per beam
